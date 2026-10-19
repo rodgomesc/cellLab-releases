@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>CellLab updates</title>
+    <link>https://github.com/rodgomesc/cellLab-releases/releases/tag/v0.1.6</link>
+    <description>Signed updates for CellLab on Apple Silicon.</description>
+    <language>en</language>
+    <item>
+      <title>CellLab 0.1.6</title>
+      <link>https://github.com/rodgomesc/cellLab-releases/releases/tag/v0.1.6</link>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+      <pubDate>Mon, 19 Oct 2026 22:34:44 +0000</pubDate>
+      <description>CellLab 0.1.6. See the public release page for downloads and signing information.</description>
+      <enclosure url="https://github.com/rodgomesc/cellLab-releases/releases/download/v0.1.6/CellLab-0.1.6-macos-arm64.zip" length="8522047" type="application/octet-stream" sparkle:edSignature="h5g/Gff8X5foHv/pMKSCHDNTdYWtnBSVBaH49/9hYm8xOqEXzSCXrPtQ+ReUSUxbH6SRAvRz8CIdD4zdL7A7Ag=="></enclosure>
+    </item>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: CwEUNXMUZoVkQUlH1g14l+gnhyAs8fUPErpEdtJpQJIM5TCv9gHmloiLVwiWVeRnqdFlumZIGSz7hF6wwHDQBQ==
+length: 1501
+-->

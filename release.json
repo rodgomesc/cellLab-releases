@@ -1,0 +1,14 @@
+{
+  "tag": "v0.1.6",
+  "version": "0.1.6",
+  "build": 7,
+  "signing": "ad-hoc, not notarized",
+  "artifacts": [
+    "CellLab-0.1.6-macos-arm64.zip",
+    "CellLab-0.1.6-macos-arm64.dmg"
+  ],
+  "signatures": {
+    "CellLab-0.1.6-macos-arm64.zip": "h5g/Gff8X5foHv/pMKSCHDNTdYWtnBSVBaH49/9hYm8xOqEXzSCXrPtQ+ReUSUxbH6SRAvRz8CIdD4zdL7A7Ag==",
+    "CellLab-0.1.6-macos-arm64.dmg": "414hAiJeK+4m2WewZD4/ZeWVZLttQQr7ASL2dc9Ph4vbxOJXTawo5rcvXUAG2vegFAMCy8fIiJ4TVkt2hUg5AQ=="
+  }
+}

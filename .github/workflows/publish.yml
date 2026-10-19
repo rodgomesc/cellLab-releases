@@ -1,0 +1,201 @@
+# Template copied to the PUBLIC binary-only repository as
+# .github/workflows/publish.yml. It has no access to private source or secrets.
+name: Publish signed CellLab update
+
+on:
+  push:
+    branches: [incoming]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: celllab-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-15
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # Deliberately pinned independently of incoming archive metadata.
+      SPARKLE_PUBLIC_ED_KEY: oKNf0nzUYcSJXKqz4J3pYMJ8mFQD8PSDb4vQlzq0FoM=
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify pinned signatures, release metadata and build ordering
+        id: release
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, plistlib, re, subprocess, urllib.error, urllib.request, xml.etree.ElementTree as ET, zipfile
+          public_key = os.environ['SPARKLE_PUBLIC_ED_KEY']
+          repository = os.environ['GITHUB_REPOSITORY']
+          release = json.loads(pathlib.Path('release.json').read_text())
+          version, build, tag = release['version'], release['build'], release['tag']
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version) or tag != 'v' + version:
+              raise SystemExit('Invalid stable release version/tag')
+          if type(build) is not int or build <= 0:
+              raise SystemExit('Invalid release build')
+          artifacts = [f'CellLab-{version}-macos-arm64.{extension}' for extension in ('zip', 'dmg')]
+          if release['artifacts'] != artifacts or set(release['signatures']) != set(artifacts):
+              raise SystemExit('Unexpected public artifact allowlist')
+          if release['signing'] not in ('ad-hoc, not notarized', 'Developer ID signed and notarized'):
+              raise SystemExit('Unknown macOS signing status')
+          allowed = set(artifacts) | {'appcast.xml', 'SHA256SUMS', 'release.json', '.github/workflows/publish.yml'}
+          actual = {str(path) for path in pathlib.Path('.').rglob('*') if path.is_file() and '.git' not in path.parts}
+          if actual != allowed:
+              raise SystemExit('Unexpected files in binary-only publication commit')
+          swift = '''import Foundation
+          import CryptoKit
+          let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: CommandLine.arguments[1])!)
+          let signature = Data(base64Encoded: CommandLine.arguments[2])!
+          let data = FileHandle.standardInput.readDataToEndOfFile()
+          exit(publicKey.isValidSignature(signature, for: data) ? 0 : 1)
+          '''
+          def verify(data, signature):
+              try:
+                  if len(base64.b64decode(signature, validate=True)) != 64:
+                      raise ValueError()
+              except ValueError:
+                  raise SystemExit('Malformed Ed25519 signature')
+              result = subprocess.run(['swift', '-e', swift, public_key, signature], input=data, capture_output=True)
+              if result.returncode:
+                  raise SystemExit('Ed25519 signature verification failed; publication stopped')
+          feed_data = pathlib.Path('appcast.xml').read_bytes()
+          signed = re.search(rb'<!-- sparkle-signatures:\s*edSignature: ([A-Za-z0-9+/=]+)\s*length: ([0-9]+)\s*-->\s*\Z', feed_data)
+          if not signed or int(signed.group(2)) != signed.start():
+              raise SystemExit('Missing or inconsistent Sparkle signed-feed trailer')
+          verify(feed_data[:signed.start()], signed.group(1).decode())
+          feed = ET.fromstring(feed_data)
+          ns = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
+          items = feed.findall('channel/item')
+          if not items or max(int(item.findtext(ns + 'version')) for item in items) != build:
+              raise SystemExit('Appcast build does not match release metadata')
+          matching = [item for item in items if item.findtext(ns + 'version') == str(build)]
+          if len(matching) != 1 or matching[0].findtext(ns + 'shortVersionString') != version:
+              raise SystemExit('Appcast has inconsistent version metadata')
+          enclosure = matching[0].find('enclosure')
+          expected_url = f'https://github.com/{repository}/releases/download/{tag}/{artifacts[0]}'
+          if enclosure.get('url') != expected_url or enclosure.get(ns + 'edSignature') != release['signatures'][artifacts[0]]:
+              raise SystemExit('Appcast points outside this immutable public release')
+          checksums = {}
+          for line in pathlib.Path('SHA256SUMS').read_text().splitlines():
+              digest, name = line.split('  ', 1)
+              checksums[name] = digest
+          if set(checksums) != set(artifacts):
+              raise SystemExit('Checksum allowlist mismatch')
+          for artifact in artifacts:
+              data = pathlib.Path(artifact).read_bytes()
+              if hashlib.sha256(data).hexdigest() != checksums[artifact]:
+                  raise SystemExit('Artifact SHA-256 mismatch')
+              verify(data, release['signatures'][artifact])
+          if enclosure.get('length') != str(pathlib.Path(artifacts[0]).stat().st_size):
+              raise SystemExit('Archive length differs from signed feed')
+          with zipfile.ZipFile(artifacts[0]) as archive:
+              infos = [item for item in archive.infolist() if item.filename == 'CellLab.app/Contents/Info.plist']
+              if len(infos) != 1 or infos[0].file_size > 1024 * 1024:
+                  raise SystemExit('Invalid application metadata in archive')
+              metadata = plistlib.loads(archive.read(infos[0]))
+          owner, name = repository.split('/')
+          expected_feed = f'https://{owner.lower()}.github.io/{name}/appcast.xml'
+          if (metadata.get('SUPublicEDKey') != public_key or metadata.get('SUFeedURL') != expected_feed
+                  or metadata.get('CFBundleVersion') != str(build)
+                  or metadata.get('CFBundleShortVersionString') != version
+                  or metadata.get('CFBundleIdentifier') != 'dev.celllab.desktop'):
+              raise SystemExit('Archive update trust/version metadata does not match publication')
+          # Independently prevent an old queued/manual run from replacing the
+          # latest public feed. GitHub API release metadata avoids CDN staleness.
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          request = urllib.request.Request(f'https://api.github.com/repos/{repository}/releases/latest', headers=headers)
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  latest = json.load(response)
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+              latest = None
+          if latest is not None:
+              assets = [asset for asset in latest['assets'] if asset['name'] == 'release.json']
+              if len(assets) != 1:
+                  raise SystemExit('Latest public release is missing version metadata')
+              with urllib.request.urlopen(assets[0]['browser_download_url'], timeout=30) as response:
+                  previous = json.load(response)
+              if previous['build'] > build or (previous['build'] == build and previous != release):
+                  raise SystemExit('Refusing an older build or changed artifacts for an existing build')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'tag={tag}\nversion={version}\nbuild={build}\n')
+          PY
+      - name: Publish GitHub Release assets before making the update discoverable
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          APP_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess, tempfile, urllib.error, urllib.request
+          release = json.loads(pathlib.Path('release.json').read_text())
+          repository, tag = os.environ['GITHUB_REPOSITORY'], release['tag']
+          artifacts = release['artifacts'] + ['SHA256SUMS', 'appcast.xml', 'release.json']
+          request = urllib.request.Request(f'https://api.github.com/repos/{repository}/releases/tags/{tag}', headers={
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  existing = json.load(response)
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+              existing = None
+          with tempfile.TemporaryDirectory() as temporary:
+              notes = pathlib.Path(temporary) / 'notes.md'
+              notes.write_text(f"CellLab {release['version']} for Apple Silicon Macs running macOS 14 or later.\n\n"
+                               f"macOS signing: **{release['signing']}**. OTA archives and the feed carry CellLab's Ed25519 update signature.\n\n"
+                               'Install the DMG once; future app updates download automatically and install when CellLab quits safely.\n')
+              if existing is None:
+                  subprocess.run(['gh', 'release', 'create', tag, '--repo', repository, '--target', os.environ['GITHUB_SHA'],
+                                  '--title', f"CellLab {release['version']}", '--notes-file', str(notes), '--draft'], check=True)
+              if existing is None or existing['draft']:
+                  subprocess.run(['gh', 'release', 'upload', tag, '--repo', repository, *artifacts, '--clobber'], check=True)
+                  subprocess.run(['gh', 'release', 'edit', tag, '--repo', repository, '--draft=false', '--latest'], check=True)
+              else:
+                  subprocess.run(['gh', 'release', 'download', tag, '--repo', repository, '--dir', temporary,
+                                  '--pattern', 'SHA256SUMS', '--pattern', 'appcast.xml', '--pattern', 'release.json'], check=True)
+                  for name in ('SHA256SUMS', 'appcast.xml', 'release.json'):
+                      if (pathlib.Path(temporary) / name).read_bytes() != pathlib.Path(name).read_bytes():
+                          raise SystemExit('Published release is immutable; refusing to replace its files')
+          PY
+      - name: Prepare the public update feed site
+        env:
+          APP_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import html, os, pathlib, shutil
+          site = pathlib.Path(os.environ['RUNNER_TEMP']) / 'celllab-pages'
+          site.mkdir()
+          shutil.copy2('appcast.xml', site / 'appcast.xml')
+          (site / '.nojekyll').touch()
+          repository, version = os.environ['GITHUB_REPOSITORY'], os.environ['APP_VERSION']
+          (site / 'index.html').write_text('<!doctype html><meta charset="utf-8"><title>CellLab downloads</title>'
+              '<meta name="viewport" content="width=device-width,initial-scale=1">'
+              '<main style="max-width:40rem;margin:4rem auto;padding:0 1rem;font:18px system-ui;line-height:1.6">'
+              '<h1>CellLab</h1><p>A native battery telemetry instrument for Apple Silicon Macs.</p>'
+              f'<p><a href="https://github.com/{html.escape(repository)}/releases/latest">Download CellLab {html.escape(version)}</a></p>'
+              '<p>The application downloads signed updates automatically and installs them after a safe quit.</p>'
+              '<p><a href="appcast.xml">Signed update feed</a></p></main>')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/celllab-pages
+      - name: Deploy the signed feed after the release is public
+        id: deployment
+        uses: actions/deploy-pages@v4
