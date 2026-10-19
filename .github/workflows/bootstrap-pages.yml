@@ -1,0 +1,68 @@
+name: Initialize signed update feed
+
+on:
+  push:
+    branches: [main]
+    paths: [appcast.xml, index.html, .github/workflows/bootstrap-pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: celllab-publication
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: macos-15
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify the empty feed and prevent replacing a published release
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, pathlib, re, subprocess, urllib.error, urllib.request, xml.etree.ElementTree as ET
+          request = urllib.request.Request('https://api.github.com/repos/' + os.environ['GITHUB_REPOSITORY'] + '/releases/latest',
+              headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+          try:
+              with urllib.request.urlopen(request, timeout=30):
+                  raise SystemExit('An application release already exists; use the release publisher instead of the bootstrap')
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+          data = pathlib.Path('appcast.xml').read_bytes()
+          signature = re.search(rb'<!-- sparkle-signatures:\s*edSignature: ([A-Za-z0-9+/=]+)\s*length: ([0-9]+)\s*-->\s*\Z', data)
+          if not signature or int(signature.group(2)) != signature.start() or ET.fromstring(data).findall('channel/item'):
+              raise SystemExit('Expected a signed, empty bootstrap appcast')
+          swift = '''import Foundation
+          import CryptoKit
+          let key = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: CommandLine.arguments[1])!)
+          let signature = Data(base64Encoded: CommandLine.arguments[2])!
+          let data = FileHandle.standardInput.readDataToEndOfFile()
+          exit(key.isValidSignature(signature, for: data) ? 0 : 1)
+          '''
+          subprocess.run(['swift', '-e', swift, 'oKNf0nzUYcSJXKqz4J3pYMJ8mFQD8PSDb4vQlzq0FoM=', signature.group(1).decode()],
+                         input=data[:signature.start()], check=True)
+          PY
+      - name: Prepare feed site
+        run: |
+          mkdir -p "$RUNNER_TEMP/celllab-pages"
+          cp appcast.xml index.html "$RUNNER_TEMP/celllab-pages/"
+          touch "$RUNNER_TEMP/celllab-pages/.nojekyll"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/celllab-pages
+      - name: Deploy signed feed
+        id: deployment
+        uses: actions/deploy-pages@v4

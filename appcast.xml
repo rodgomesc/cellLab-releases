@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>CellLab updates</title>
+    <link>https://github.com/rodgomesc/cellLab-releases/releases</link>
+    <description>Signed CellLab updates for Apple Silicon Macs. The first updater-enabled release is being prepared.</description>
+    <language>en</language>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: K2n9xuEhoAGnCACkReS3cT5GH8WgN8vkqweX6uvU5xVExEhctDAgYHSPc1pPeUN7hW2Ow+s3mK2t0SsFfwhxDQ==
+length: 676
+-->
