@@ -1,0 +1,65 @@
+# One-time compatibility workflow for the existing cellLab-releases repository.
+# It publishes only the canonical signed feed; it never creates a legacy release.
+name: Migrate installed apps to the Liion Fix update feed
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: celllab-publication
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: macos-15
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Verify and stage the canonical signed migration feed
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib, re, subprocess, urllib.request, xml.etree.ElementTree as ET
+          base = 'https://rodgomesc.github.io/liion-fix'
+          public = 'oKNf0nzUYcSJXKqz4J3pYMJ8mFQD8PSDb4vQlzq0FoM='
+          with urllib.request.urlopen(base + '/appcast.xml', timeout=30) as response:
+              data = response.read(2 * 1024 * 1024 + 1)
+          if len(data) > 2 * 1024 * 1024 or b'<!DOCTYPE' in data.upper() or b'<!ENTITY' in data.upper():
+              raise SystemExit('Invalid migration feed')
+          signed = re.search(rb'<!-- sparkle-signatures:\s*edSignature: ([A-Za-z0-9+/=]+)\s*length: ([0-9]+)\s*-->\s*\Z', data)
+          if not signed or int(signed.group(2)) != signed.start() or len(base64.b64decode(signed.group(1), validate=True)) != 64:
+              raise SystemExit('Missing signed-feed trailer')
+          swift = '''import Foundation
+          import CryptoKit
+          let key = try Curve25519.Signing.PublicKey(rawRepresentation: Data(base64Encoded: CommandLine.arguments[1])!)
+          let signature = Data(base64Encoded: CommandLine.arguments[2])!
+          exit(key.isValidSignature(signature, for: FileHandle.standardInput.readDataToEndOfFile()) ? 0 : 1)
+          '''
+          subprocess.run(['swift', '-e', swift, public, signed.group(1).decode()],
+                         input=data[:signed.start()], check=True, capture_output=True)
+          ns = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
+          items = ET.fromstring(data).findall('channel/item')
+          latest = max(items, key=lambda item: int(item.findtext(ns + 'version')))
+          if int(latest.findtext(ns + 'version')) < 11 or not latest.find('enclosure').get('url').startswith(base + '/releases/'):
+              raise SystemExit('Migration must offer a signed canonical release at build 11 or later')
+          site = pathlib.Path(os.environ['RUNNER_TEMP']) / 'liion-fix-migration'
+          site.mkdir()
+          (site / 'appcast.xml').write_bytes(data)
+          (site / '.nojekyll').touch()
+          (site / 'index.html').write_text('<!doctype html><meta charset="utf-8"><title>Liion Fix downloads moved</title>'
+              '<h1>Liion Fix</h1><p><a href="' + base + '/">Download the current installer</a></p>'
+              '<p>Existing installations can update normally and will then use the new update feed.</p>')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ runner.temp }}/liion-fix-migration
+      - name: Deploy the compatibility feed
+        id: deployment
+        uses: actions/deploy-pages@v4
