@@ -1,6 +1,6 @@
 # Template copied to the PUBLIC binary-only repository as
 # .github/workflows/publish.yml. It has no access to private source or secrets.
-name: Publish signed CellLab update
+name: Publish signed Liion Fix update
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
               raise SystemExit('Invalid stable release version/tag')
           if type(build) is not int or build <= 0:
               raise SystemExit('Invalid release build')
-          artifacts = [f'CellLab-{version}-macos-arm64.{extension}' for extension in ('zip', 'dmg')]
+          artifacts = [f'LiionFix-{version}-macos-arm64.{extension}' for extension in ('zip', 'dmg')]
           if release['artifacts'] != artifacts or set(release['signatures']) != set(artifacts):
               raise SystemExit('Unexpected public artifact allowlist')
           if release['signing'] not in ('ad-hoc, not notarized', 'Developer ID signed and notarized'):
@@ -103,7 +103,7 @@ jobs:
           if enclosure.get('length') != str(pathlib.Path(artifacts[0]).stat().st_size):
               raise SystemExit('Archive length differs from signed feed')
           with zipfile.ZipFile(artifacts[0]) as archive:
-              infos = [item for item in archive.infolist() if item.filename == 'CellLab.app/Contents/Info.plist']
+              infos = [item for item in archive.infolist() if item.filename == 'Liion Fix.app/Contents/Info.plist']
               if len(infos) != 1 or infos[0].file_size > 1024 * 1024:
                   raise SystemExit('Invalid application metadata in archive')
               metadata = plistlib.loads(archive.read(infos[0]))
@@ -157,12 +157,12 @@ jobs:
               existing = None
           with tempfile.TemporaryDirectory() as temporary:
               notes = pathlib.Path(temporary) / 'notes.md'
-              notes.write_text(f"CellLab {release['version']} for Apple Silicon Macs running macOS 14 or later.\n\n"
-                               f"macOS signing: **{release['signing']}**. OTA archives and the feed carry CellLab's Ed25519 update signature.\n\n"
-                               'Install the DMG once; future app updates download automatically and install when CellLab quits safely.\n')
+              notes.write_text(f"Liion Fix {release['version']} for Apple Silicon Macs running macOS 14 or later.\n\n"
+                               f"macOS signing: **{release['signing']}**. OTA archives and the feed carry Liion Fix's Ed25519 update signature.\n\n"
+                               'Install the DMG once; future app updates download automatically and install when Liion Fix quits safely.\n')
               if existing is None:
                   subprocess.run(['gh', 'release', 'create', tag, '--repo', repository, '--target', os.environ['GITHUB_SHA'],
-                                  '--title', f"CellLab {release['version']}", '--notes-file', str(notes), '--draft'], check=True)
+                                  '--title', f"Liion Fix {release['version']}", '--notes-file', str(notes), '--draft'], check=True)
               if existing is None or existing['draft']:
                   subprocess.run(['gh', 'release', 'upload', tag, '--repo', repository, *artifacts, '--clobber'], check=True)
                   subprocess.run(['gh', 'release', 'edit', tag, '--repo', repository, '--draft=false', '--latest'], check=True)
@@ -184,11 +184,11 @@ jobs:
           shutil.copy2('appcast.xml', site / 'appcast.xml')
           (site / '.nojekyll').touch()
           repository, version = os.environ['GITHUB_REPOSITORY'], os.environ['APP_VERSION']
-          (site / 'index.html').write_text('<!doctype html><meta charset="utf-8"><title>CellLab downloads</title>'
+          (site / 'index.html').write_text('<!doctype html><meta charset="utf-8"><title>Liion Fix downloads</title>'
               '<meta name="viewport" content="width=device-width,initial-scale=1">'
               '<main style="max-width:40rem;margin:4rem auto;padding:0 1rem;font:18px system-ui;line-height:1.6">'
-              '<h1>CellLab</h1><p>A native battery telemetry instrument for Apple Silicon Macs.</p>'
-              f'<p><a href="https://github.com/{html.escape(repository)}/releases/latest">Download CellLab {html.escape(version)}</a></p>'
+              '<h1>Liion Fix</h1><p>A native battery telemetry instrument for Apple Silicon Macs.</p>'
+              f'<p><a href="https://github.com/{html.escape(repository)}/releases/latest">Download Liion Fix {html.escape(version)}</a></p>'
               '<p>The application downloads signed updates automatically and installs them after a safe quit.</p>'
               '<p><a href="appcast.xml">Signed update feed</a></p></main>')
           PY
