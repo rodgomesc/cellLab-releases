@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Liion Fix updates</title>
+    <link>https://github.com/rodgomesc/cellLab-releases/releases/tag/v0.1.9</link>
+    <description>Signed updates for Liion Fix on Apple Silicon.</description>
+    <language>en</language>
+    <item>
+      <title>Liion Fix 0.1.9</title>
+      <link>https://github.com/rodgomesc/cellLab-releases/releases/tag/v0.1.9</link>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>0.1.9</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+      <pubDate>Tue, 20 Oct 2026 14:51:58 +0000</pubDate>
+      <description>Liion Fix 0.1.9. See the public release page for downloads and signing information.</description>
+      <enclosure url="https://github.com/rodgomesc/cellLab-releases/releases/download/v0.1.9/LiionFix-0.1.9-macos-arm64.zip" length="9676998" type="application/octet-stream" sparkle:edSignature="Xq//8L80y4B9NhPwfHjlukd02djmSTnBfREyg7hamPPU8HBv5ur06/J3j4Xo2E/68AYfs2HFkybVUDvZBe+CBw=="></enclosure>
+    </item>
+    <item>
+      <title>CellLab 0.1.6</title>
+      <link>https://github.com/rodgomesc/cellLab-releases/releases/tag/v0.1.6</link>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+      <pubDate>Mon, 19 Oct 2026 22:34:44 +0000</pubDate>
+      <description>CellLab 0.1.6. See the public release page for downloads and signing information.</description>
+      <enclosure url="https://github.com/rodgomesc/cellLab-releases/releases/download/v0.1.6/CellLab-0.1.6-macos-arm64.zip" length="8522047" type="application/octet-stream" sparkle:edSignature="h5g/Gff8X5foHv/pMKSCHDNTdYWtnBSVBaH49/9hYm8xOqEXzSCXrPtQ+ReUSUxbH6SRAvRz8CIdD4zdL7A7Ag=="></enclosure>
+    </item>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: 7tOwDYjIwNejm0UtVnem5FFlhfrfSjZS+HAv69yxZucGFbgA7p9g6oVUiHV2V+H30PnEKkAdUPptVvYnr2JwDg==
+length: 2380
+-->

@@ -1,0 +1,14 @@
+{
+  "tag": "v0.1.9",
+  "version": "0.1.9",
+  "build": 10,
+  "signing": "ad-hoc, not notarized",
+  "artifacts": [
+    "LiionFix-0.1.9-macos-arm64.zip",
+    "LiionFix-0.1.9-macos-arm64.dmg"
+  ],
+  "signatures": {
+    "LiionFix-0.1.9-macos-arm64.zip": "Xq//8L80y4B9NhPwfHjlukd02djmSTnBfREyg7hamPPU8HBv5ur06/J3j4Xo2E/68AYfs2HFkybVUDvZBe+CBw==",
+    "LiionFix-0.1.9-macos-arm64.dmg": "7M4GNrrfDZa+10BDxlaBDMew2OCBngqgzqjfVYr5V93tlyg1ZW63UnmUniNSGj8Mak1xO/jOBwnMM6vChhnsCw=="
+  }
+}
